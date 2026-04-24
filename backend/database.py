@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
 # Baca kunci dari .env
-load_dotenv("ai_engine/.env")
+load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Nyalain mesin penghubung ke PostgreSQL

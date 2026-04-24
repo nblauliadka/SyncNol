@@ -8,6 +8,7 @@ import {
   Lock,
   Activity,
   Send,
+  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useAppStore from "../store/useAppStore";
@@ -44,11 +45,11 @@ export default function AdminPortalPage() {
   };
 
   const cardClass =
-    "bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm";
+    "bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm";
 
   if (checking) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-fintech-dark">
+      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-[#0B0F19]">
         <div className="flex flex-col items-center gap-4 opacity-50">
           <Shield size={48} className="animate-pulse text-fintech-primary" />
           <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -61,7 +62,7 @@ export default function AdminPortalPage() {
 
   if (!isAdmin) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50 dark:bg-fintech-dark">
+      <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50 dark:bg-[#0B0F19]">
         <Lock size={64} className="text-red-500 mb-6" />
         <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">
           Access Denied
@@ -75,7 +76,7 @@ export default function AdminPortalPage() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-y-auto bg-slate-50 dark:bg-fintech-dark text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300">
+    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-y-auto bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300 pb-24 md:pb-8">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
         <div>

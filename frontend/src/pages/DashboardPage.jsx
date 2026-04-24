@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import axios from "axios";
+import toast from "react-hot-toast";
 import useAppStore from "../store/useAppStore";
 import {
   Send,
@@ -23,14 +24,26 @@ import {
   Paperclip,
   ChevronDown,
   CheckCircle,
+  Plus,
+  X
 } from "lucide-react";
 
+const formatIDR = (num) => new Intl.NumberFormat('id-ID').format(num);
+
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
+};
+
 const GREETINGS = [
-  "Morning. Net worth stable, but server bills hit tomorrow. Cut the coffee today.",
-  "Agent. Your savings rate dropped 3% this month. We need to talk.",
-  "Good morning. You have 2 recurring leaks I haven't told you about yet. Open Antigravity.",
-  "Back again. Your emergency fund covers 12 days. The target is 90. Focus.",
-  "Rise and grind. Passive income: Rp 0. Active income: stagnant. Time to fix both.",
+  "Pagi. Kekayaan stabil, tapi tagihan server besok. Kurangi kopi hari ini.",
+  "Agen. Tingkat tabunganmu turun 3% bulan ini. Kita perlu bicara.",
+  "Selamat pagi. Ada 2 kebocoran rutin yang belum kuberitahu. Buka Bebas Hutang.",
+  "Kembali lagi. Dana daruratmu cukup untuk 12 hari. Targetnya 90. Fokus.",
+  "Bangun dan bekerja. Pendapatan pasif: Rp 0. Pendapatan aktif: stagnan. Waktunya perbaiki keduanya.",
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -41,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }) => {
           {label}
         </p>
         <p className="text-fintech-primary font-bold text-sm font-mono">
-          Rp {payload[0].value?.toLocaleString("id-ID")}
+          {formatIDR(payload[0].value)}
         </p>
       </div>
     );
@@ -60,14 +73,82 @@ export default function DashboardPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [panicMode, setPanicMode] = useState(false);
-  const [localChat, setLocalChat] = useState([]);
-  const [persona, setPersona] = useState("Roast");
+  const [messages, setMessages] = useState([]);
+  const [persona, setPersona] = useState("Keras");
   const [showPersonas, setShowPersonas] = useState(false);
   const chatEndRef = useRef(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  const [netWorth, setNetWorth] = useState(0);
+  const [totalDebt, setTotalDebt] = useState(0);
+  const [dailyBudget, setDailyBudget] = useState(0);
+  const [chartData, setChartData] = useState([]);
+
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualType, setManualType] = useState("Expense");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualDesc, setManualDesc] = useState("");
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'id-ID';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setChatInput((prev) => (prev ? prev + " " + transcript : transcript));
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Pengenalan suara tidak didukung di browser ini.");
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const fetchData = useCallback(async () => {
     if (!dbUserId) return;
     try {
+      // PHASE 1.3: Centralized Data Fetching Verified
       const [sumRes, trxRes] = await Promise.all([
         axios.get(`http://127.0.0.1:8000/api/users/${dbUserId}/summary`),
         axios.get(`http://127.0.0.1:8000/api/users/${dbUserId}/transactions`),
@@ -84,44 +165,43 @@ export default function DashboardPage() {
   }, [fetchData]);
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [localChat]);
+  }, [messages]);
 
   const handleChat = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !dbUserId) return;
-    const userMsg = { sender: "user", text: chatInput };
-    setLocalChat((p) => [...p, userMsg]);
+    if (e && e.preventDefault) e.preventDefault();
+    if (!chatInput.trim() && !selectedImage) return;
+    const userMsg = { sender: "user", text: chatInput || "Mengirim gambar", image: selectedImage };
+    setMessages((p) => [...p, userMsg]);
     setChatInput("");
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setChatLoading(true);
     try {
-      // Pass persona down to the nudge API (even if backend ignores it for now)
-      const res = await axios.post("http://127.0.0.1:8000/api/nudge", {
-        user_id: dbUserId,
-        pesan_user: userMsg.text,
-        persona,
-      });
-      let aiText = res.data.ai_roast;
-
-      // MOCK ACTIONABLE OUTPUT PARSING
-      let action = null;
-      if (userMsg.text.toLowerCase().includes("split")) {
-        aiText =
-          "I've calculated the split. Rp 150,000 per person for 3 people.";
-        action = { type: "wingman", label: "Launch Wingman QRIS" };
-      } else if (userMsg.text.toLowerCase().includes("lock")) {
-        aiText =
-          "Locking 500k into The Vault. You will need to solve a math puzzle to release it.";
-        action = { type: "vault", label: "View The Vault" };
+      // PHASE 1.2: J.A.R.V.I.S State Reconciliation
+      let apiUrl = "http://127.0.0.1:8000/api/nudge";
+      let requestBody = { pesan_user: userMsg.text, user_id: dbUserId };
+      
+      if (userMsg.image) {
+        apiUrl = "http://127.0.0.1:8000/api/chat";
+        requestBody = { message: userMsg.text, image: userMsg.image };
       }
 
-      setLocalChat((p) => [...p, { sender: "ai", text: aiText, action }]);
-      fetchData();
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await res.json();
+      let aiText = data.ai_roast || data.response || "Tidak ada respons";
+
+      setMessages((p) => [...p, { sender: "ai", text: aiText }]);
+      await fetchData();
     } catch {
-      setLocalChat((p) => [
+      setMessages((p) => [
         ...p,
         {
           sender: "ai",
-          text: "Agent offline. Backend unreachable. Check your server.",
+          text: "Agen offline. Backend tidak terjangkau. Periksa server Anda.",
         },
       ]);
     } finally {
@@ -129,57 +209,121 @@ export default function DashboardPage() {
     }
   };
 
-  const monthlyIncome = summary.monthly_income || 0;
-  const runwayDays =
-    monthlyIncome > 0 && summary.net_worth > 0
-      ? Math.floor(summary.net_worth / (monthlyIncome / 30))
-      : 0;
-  const runwayColor =
-    runwayDays < 30
-      ? "text-red-500 bg-red-500"
-      : runwayDays < 90
-        ? "text-amber-500 bg-amber-500"
-        : "text-fintech-primary bg-fintech-primary";
+  useEffect(() => {
+    const baseNetWorth = summary.net_worth || 0;
+    const baseDebt = summary.total_utang || 0;
 
-  const chartData = (() => {
-    if (!transactions.length)
-      return [{ name: "Now", balance: summary.net_worth }];
-    let balance = summary.net_worth;
-    const points = [...transactions].reverse().map((t) => {
-      const point = {
-        name: new Date(t.tanggal || Date.now()).toLocaleDateString("id-ID", {
-          month: "short",
-          day: "numeric",
-        }),
-        balance,
-      };
-      if (t.jenis === "Pemasukan") balance -= t.nominal;
-      else balance += t.nominal;
-      return point;
-    });
-    return [{ name: "Start", balance }, ...points];
-  })();
+    setNetWorth(baseNetWorth);
+    setTotalDebt(baseDebt);
 
-  // Base card class
+    // Daily Budget: (Total Cash - Total Debt) / Remaining Days in Month
+    const today = new Date();
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const remainingDays = Math.max(1, lastDayOfMonth - today.getDate() + 1);
+    const availableCash = Math.max(0, baseNetWorth - baseDebt);
+    setDailyBudget(Math.floor(availableCash / remainingDays));
+
+    // No dummy data — only render chart when real transactions exist
+    if (transactions.length > 0) {
+      let balance = baseNetWorth;
+      const points = [...transactions].reverse().map((t) => {
+        const point = {
+          name: new Date(t.tanggal || Date.now()).toLocaleDateString("id-ID", { month: "short", day: "numeric" }),
+          balance,
+        };
+        if (t.jenis === "Pemasukan") balance -= t.nominal;
+        else balance += t.nominal;
+        return point;
+      });
+      setChartData([{ name: "Mulai", balance }, ...points]);
+    } else {
+      setChartData([]);
+    }
+  }, [summary, transactions]);
+
+  const handleManualSubmit = async (e) => {
+    e.preventDefault();
+    const rawAmount = manualAmount || 0;
+    if (rawAmount === 0 || !dbUserId) return;
+
+    try {
+      const typeStr = manualType === "Income" ? "Pemasukan" : "Pengeluaran";
+      const catStr = manualType === "Debt Payment" ? "Bayar Utang" : (manualDesc || "Manual");
+      
+      // PHASE 1.1: Dashboard Manual Entry Sync - Async write to DB BEFORE local store update
+      const res = await axios.post("http://127.0.0.1:8000/api/transactions", {
+        jenis_transaksi: typeStr,
+        kategori: catStr,
+        nominal: rawAmount,
+        keterangan: manualDesc || manualType,
+        user_id: dbUserId
+      });
+
+      if (res.data.status === "success") {
+        toast.success("Data tersinkronisasi ke database.");
+        // Fetch the latest state directly from backend to avoid overwriting with stale data
+        await fetchData();
+
+        setShowManualModal(false);
+        setManualAmount("");
+        setManualDesc("");
+      } else {
+        toast.error("Gagal menyimpan: " + res.data.pesan);
+      }
+    } catch (error) {
+      console.error("Manual entry error:", error);
+      toast.error("Gagal sinkronisasi ke database.");
+    }
+  };
+
+  const handleAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/\./g, "");
+    if (!isNaN(rawValue) && rawValue !== "") {
+      setManualAmount(parseInt(rawValue, 10));
+    } else if (rawValue === "") {
+      setManualAmount("");
+    }
+  };
+
+  const dailyBudgetColor =
+    dailyBudget <= 0
+      ? "text-red-500"
+      : dailyBudget < 50000
+        ? "text-amber-500"
+        : "text-fintech-primary";
+
+  const netWorthColor =
+    netWorth < 0
+      ? "text-red-500"
+      : "text-slate-900 dark:text-white";
+
   const cardClass =
-    "bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm flex flex-col relative overflow-hidden";
+    "bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm flex flex-col relative overflow-hidden hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer transition-colors";
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-hidden min-h-0 bg-slate-50 dark:bg-fintech-dark text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300">
-      {/* HEADER ROW */}
-      <div className="flex items-start justify-between gap-4 flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-fintech-primary animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-              Morning Briefing
-            </span>
+    <div className="min-h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300 pb-24 md:pb-8">
+      {/* HEADER HERO */}
+      <div className="flex items-end justify-between flex-shrink-0 mb-2">
+        <div>
+          <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">
+            Total Kekayaan
           </div>
-          <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl font-mono">
-            <span className="text-fintech-primary">⚡</span> <em>{greeting}</em>
-          </p>
+          <div className="flex items-baseline gap-3">
+            <h1 className={`text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none truncate ${netWorthColor}`}>
+              {formatIDR(netWorth)}
+            </h1>
+            {netWorth < 0 ? (
+              <span className="flex items-center gap-1 text-sm md:text-base font-bold text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/20 px-2.5 py-1 rounded-xl">
+                <ArrowDownRight size={16} /> Defisit
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-sm md:text-base font-bold text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-500/10 px-2.5 py-1 rounded-xl">
+                <ArrowUpRight size={16} /> +{formatIDR(2500000)} (5.2%) Hari Ini
+              </span>
+            )}
+          </div>
         </div>
-        <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 text-right flex-shrink-0 font-medium">
+        <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 text-right flex-shrink-0 font-medium hidden sm:block">
           {new Date().toLocaleDateString("id-ID", {
             weekday: "long",
             day: "numeric",
@@ -190,113 +334,80 @@ export default function DashboardPage() {
       </div>
 
       {/* MAIN GRID */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 grid-rows-none lg:grid-rows-2 gap-4 lg:gap-6 min-h-0 overflow-y-auto lg:overflow-hidden">
-        {/* NET WORTH — spans 3 cols, 2 rows */}
-        <div
-          className={`${cardClass} lg:col-span-3 lg:row-span-2 justify-between bg-gradient-to-b from-blue-50/50 to-white dark:from-blue-900/10 dark:to-gray-900`}
-        >
-          <div className="absolute -top-10 -right-10 text-9xl opacity-5 pointer-events-none select-none">
-            💰
-          </div>
+      <div className="flex flex-col md:grid md:grid-cols-12 gap-4 md:gap-6">
 
-          <div>
-            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">
-              Total Net Worth
-            </div>
-            <div className="text-3xl lg:text-4xl xl:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight mb-2 truncate">
-              Rp {summary.net_worth.toLocaleString("id-ID")}
-            </div>
-            <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              Total Assets & Equity
-            </div>
-          </div>
-
-          <div className="flex flex-col xl:flex-row gap-3 mt-8">
-            <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
-                <ArrowUpRight size={14} className="text-green-500" /> Income
-              </div>
-              <div className="text-lg font-bold text-slate-900 dark:text-white truncate">
-                +Rp {(summary.pemasukan / 1e6).toFixed(1)}M
-              </div>
-            </div>
-            <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
-                <ArrowDownRight size={14} className="text-red-500" /> Expense
-              </div>
-              <div className="text-lg font-bold text-slate-900 dark:text-white truncate">
-                -Rp {(summary.pengeluaran / 1e6).toFixed(1)}M
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CHART — spans 6 cols, 1 row */}
-        <div className={`${cardClass} lg:col-span-6 lg:row-span-1`}>
+        {/* CHART */}
+        <div className={`${cardClass} w-full md:col-span-8`}>
           <div className="flex justify-between items-center mb-4 flex-shrink-0">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <Activity size={16} className="text-fintech-primary" /> Wealth
-              Trajectory
+              <Activity size={16} className="text-fintech-primary" /> Grafik Kekayaan
             </h3>
             <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-fintech-primary text-[10px] font-bold uppercase tracking-wider rounded-md">
-              Live
+              Langsung
             </span>
           </div>
-          <div className="flex-1 min-h-[150px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="wealthGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="name"
-                  stroke="currentColor"
-                  className="text-slate-400 dark:text-slate-600 text-[10px]"
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  stroke="currentColor"
-                  className="text-slate-400 dark:text-slate-600 text-[10px]"
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="#3B82F6"
-                  strokeWidth={3}
-                  fill="url(#wealthGrad)"
-                  dot={false}
-                  activeDot={{
-                    r: 6,
-                    fill: "#3B82F6",
-                    stroke: "#fff",
-                    strokeWidth: 2,
-                  }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="w-full h-[220px]">
+            {chartData.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                <Activity size={32} className="text-slate-300 dark:text-slate-700" />
+                <p className="text-sm font-semibold text-slate-400 dark:text-slate-600">Belum Ada Data</p>
+                <p className="text-xs text-slate-400 dark:text-slate-600 max-w-[200px]">
+                  Catat transaksi pertamamu untuk melihat grafik kekayaan.
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="wealthGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="currentColor"
+                    className="text-slate-200 dark:text-slate-800"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    stroke="currentColor"
+                    className="text-slate-400 dark:text-slate-600 text-[10px]"
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={['auto', 'auto']}
+                    width={85}
+                    stroke="currentColor"
+                    className="text-slate-400 dark:text-slate-600 text-[10px]"
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => formatIDR(value)}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="balance"
+                    stroke="#0EA5E9"
+                    strokeWidth={2.5}
+                    fill="url(#wealthGradient)"
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* AI CHAT — spans 3 cols, 2 rows */}
+        {/* AI CHAT */}
         <div
-          className={`${cardClass} lg:col-span-3 lg:row-span-2 !p-0 flex flex-col`}
+          className={`${cardClass} w-full md:col-span-4 md:row-span-2 !p-0 flex flex-col min-h-[350px] md:min-h-0`}
         >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0 bg-slate-50/50 dark:bg-gray-800/30">
             <div className="flex items-center gap-3">
@@ -309,49 +420,57 @@ export default function DashboardPage() {
                   J.A.R.V.I.S
                 </div>
                 <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-                  FinTech Core
+                  Inti FinTech
                 </div>
               </div>
             </div>
 
-            {/* Persona Switcher */}
-            <div className="relative">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowPersonas(!showPersonas)}
-                className="flex items-center gap-1.5 text-xs font-bold bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2 py-1 rounded-md text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                onClick={() => setShowManualModal(true)}
+                className="flex items-center gap-1.5 text-xs font-bold bg-fintech-primary/10 text-fintech-primary border border-fintech-primary/20 px-3 py-1.5 rounded-md hover:bg-fintech-primary/20 transition-colors"
               >
-                {persona} <ChevronDown size={14} />
+                <Plus size={14} /> Manual
               </button>
-              {showPersonas && (
-                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-20">
-                  {["Roast", "Strict", "Friendly"].map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        setPersona(p);
-                        setShowPersonas(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
+              
+              <div className="relative">
+                <button
+                  onClick={() => setShowPersonas(!showPersonas)}
+                  className="flex items-center gap-1.5 text-xs font-bold bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2 py-1.5 rounded-md text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                >
+                  {persona} <ChevronDown size={14} />
+                </button>
+                {showPersonas && (
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-20">
+                    {["Keras", "Tegas", "Ramah"].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          setPersona(p);
+                          setShowPersonas(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            {localChat.length === 0 && (
+            {messages.length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 opacity-50">
                 <Zap size={32} className="text-slate-400" />
                 <p className="text-xs font-medium text-slate-500 max-w-[200px]">
-                  "Jarvis, logged my 5M salary today"
-                  <br /> Try logging a transaction.
+                  "Jarvis, catat gaji 5 juta hari ini"
+                  <br /> Coba tanyakan apa saja.
                 </p>
               </div>
             )}
-            {localChat.map((m, i) => (
+            {messages.map((m, i) => (
               <div
                 key={i}
                 className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
@@ -366,6 +485,9 @@ export default function DashboardPage() {
                   }
                 `}
                 >
+                  {m.image && (
+                    <img src={m.image} alt="Upload preview" className="w-32 h-32 object-cover rounded-lg mb-2 border border-slate-200 dark:border-slate-700" />
+                  )}
                   {m.text}
                   {m.action && (
                     <button
@@ -379,31 +501,43 @@ export default function DashboardPage() {
               </div>
             ))}
             {chatLoading && (
-              <div className="flex items-center gap-1.5 px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm w-fit">
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-fintech-primary animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-fintech-primary animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-fintech-primary animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
+              <div className="flex items-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm w-fit text-sm text-slate-500 dark:text-slate-400 italic">
+                J.A.R.V.I.S sedang mengetik...
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
 
           <form
-            onSubmit={handleChat}
-            className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-gray-900 flex-shrink-0"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleChat(e);
+            }}
+            className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] flex-shrink-0 mt-auto"
           >
-            <div className="flex gap-2 items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-fintech-primary/50 transition-all">
+            {selectedImage && (
+              <div className="mb-2 relative inline-block">
+                <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded-md border border-slate-200 dark:border-slate-700" />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-[#0B0F19] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 focus-within:ring-2 focus-within:ring-fintech-primary/50 transition-all">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+              />
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-slate-400 hover:text-fintech-primary transition-colors flex-shrink-0"
                 title="OCR Receipt Drop"
               >
@@ -412,83 +546,82 @@ export default function DashboardPage() {
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Log expense, split bill..."
+                placeholder="Catat pengeluaran, bagi tagihan..."
                 disabled={chatLoading}
-                className="flex-1 bg-transparent border-none px-1 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none min-w-0"
               />
               <button
                 type="button"
-                className="p-2 text-slate-400 hover:text-fintech-primary transition-colors flex-shrink-0"
-                title="Voice Input"
+                onClick={toggleListening}
+                className={`p-2 transition-colors flex-shrink-0 ${isListening ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-fintech-primary'}`}
+                title="Input Suara"
               >
                 <Mic size={18} />
               </button>
               <button
                 type="submit"
-                disabled={chatLoading || !chatInput.trim()}
-                className="w-10 h-10 bg-fintech-primary hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 disabled:hover:bg-fintech-primary flex-shrink-0"
+                disabled={chatLoading || (!chatInput.trim() && !selectedImage)}
+                className="w-8 h-8 bg-fintech-primary hover:bg-blue-700 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:hover:bg-fintech-primary flex-shrink-0"
               >
-                <Send size={16} />
+                <Send size={14} />
               </button>
             </div>
           </form>
         </div>
 
-        {/* RUNWAY METER — spans 3 cols, 1 row */}
+        {/* DAILY BUDGET CARD */}
         <div
-          className={`${cardClass} lg:col-span-3 lg:row-span-1 justify-between`}
+          className={`${cardClass} w-full md:col-span-4 justify-between !p-4`}
         >
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">
-              <ShieldAlert size={16} /> Survival Runway
+              <ShieldAlert size={16} /> Batas Jajan Harian
             </div>
             <div className="flex items-baseline gap-2">
-              <span
-                className={`text-4xl font-black tracking-tight ${runwayColor.split(" ")[0]}`}
-              >
-                {runwayDays}
+              <span className={`text-3xl lg:text-4xl font-black tracking-tight ${dailyBudgetColor}`}>
+                {formatIDR(dailyBudget)}
               </span>
-              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                days
-              </span>
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">/hari</span>
             </div>
-            {monthlyIncome === 0 ? (
+            {dailyBudget <= 0 ? (
               <div className="text-xs text-red-500 dark:text-red-400 mt-2 font-medium bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                ⚠️ Update income to calculate runway
+                ⚠️ Aset bersih habis atau defisit. Stop pengeluaran!
               </div>
             ) : (
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">
-                Based on base income (Rp {(monthlyIncome / 1e6).toFixed(1)}M/mo)
+                (Total Kas − Utang) ÷ sisa hari bulan ini
               </div>
             )}
           </div>
 
-          <div className="mt-6">
-            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              <span>0</span>
-              <span>90d goal</span>
+          <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <span>Aman</span>
+              <span>Rp {formatIDR(100000)}/hari</span>
             </div>
-            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-1000 ease-out ${runwayColor.split(" ")[1]}`}
-                style={{ width: `${Math.min((runwayDays / 90) * 100, 100)}%` }}
+                className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                  dailyBudget <= 0 ? "bg-red-500" : dailyBudget < 50000 ? "bg-amber-500" : "bg-fintech-primary"
+                }`}
+                style={{ width: `${Math.min((dailyBudget / 100000) * 100, 100)}%` }}
               />
             </div>
           </div>
         </div>
 
-        {/* PANIC BUTTON + DEBT — spans 3 cols, 1 row */}
+        {/* PANIC BUTTON + DEBT */}
         <div
-          className={`${cardClass} lg:col-span-3 lg:row-span-1 justify-between`}
+          className={`${cardClass} w-full md:col-span-4 justify-between !p-4`}
         >
           <div>
             <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">
-              Total Debt
+              Total Utang
             </div>
             <div
-              className={`text-2xl lg:text-3xl font-black tracking-tight truncate ${summary.total_utang > 0 ? "text-red-500" : "text-slate-900 dark:text-white"}`}
+              className={`text-2xl lg:text-3xl font-black tracking-tight truncate ${totalDebt > 0 ? "text-red-500" : "text-slate-900 dark:text-white"}`}
             >
-              Rp {summary.total_utang.toLocaleString("id-ID")}
+              {formatIDR(totalDebt)}
             </div>
           </div>
 
@@ -510,10 +643,74 @@ export default function DashboardPage() {
               size={18}
               className={panicMode ? "animate-bounce" : ""}
             />
-            {panicMode ? "IMPULSE BUY DETECTED" : "Panic / Impulse Buy"}
+            {panicMode ? "PEMBELIAN IMPULSIF TERDETEKSI" : "Panik / Pembelian Impulsif"}
           </button>
         </div>
       </div>
+
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-[#0B0F19] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Activity className="text-fintech-primary" /> Entry Manual
+              </h2>
+              <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleManualSubmit} className="p-5 flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Jenis Transaksi</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {["Income", "Expense", "Debt Payment"].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setManualType(t)}
+                      className={`py-2 px-1 text-xs font-bold rounded-lg border transition-colors ${manualType === t ? "bg-fintech-primary text-white border-fintech-primary" : "bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                    >
+                      {t === "Income" ? "Pemasukan" : t === "Expense" ? "Pengeluaran" : "Bayar Utang"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Nominal (IDR)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Rp</span>
+                  <input
+                    type="text"
+                    value={manualAmount ? formatIDR(manualAmount) : ""}
+                    onChange={handleAmountChange}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-10 pr-4 text-slate-900 dark:text-white font-mono font-bold focus:ring-2 focus:ring-fintech-primary/50 outline-none transition-all"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Kategori / Catatan</label>
+                <input
+                  type="text"
+                  value={manualDesc}
+                  onChange={(e) => setManualDesc(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-fintech-primary/50 outline-none transition-all text-sm"
+                  placeholder="Makan siang, Gaji, dll..."
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-fintech-primary hover:bg-blue-700 text-white font-bold py-3 rounded-xl mt-2 transition-colors flex items-center justify-center gap-2"
+              >
+                <CheckCircle size={18} /> Simpan Transaksi
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+import base64
 import os
 import time
 import json
@@ -12,12 +13,15 @@ import chromadb
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from .database import engine, Base, SessionLocal
-from . import models
+from database import engine, Base, SessionLocal
+import models
 
 # ==========================================
 # 1. INISIALISASI & SETUP
 # ==========================================
+
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="SyncNol AI Core", description="API Asisten Keuangan All-Round + RAG POJK")
 
 app.add_middleware(
@@ -28,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-load_dotenv("ai_engine/.env")
+load_dotenv()
 client = genai.Client()
 
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
@@ -45,7 +49,7 @@ def startup_event():
 
     print("🚀 [PRODUCTION MODE] Membaca Dokumen PDF POJK Asli...")
     try:
-        loader = PyPDFLoader("docs/pojk_asli.pdf")
+        loader = PyPDFLoader("../docs/pojk_asli.pdf")
         dokumen_mentah = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks = text_splitter.split_documents(dokumen_mentah)
@@ -114,9 +118,45 @@ class TransactionCreate(BaseModel):
     keterangan: Optional[str] = None
     user_id: int
 
+class ChatRequest(BaseModel):
+    message: str
+    image: Optional[str] = None
+
 # ==========================================
 # 4. ENDPOINT AI (AGENTIC AUTO-JOURNALING)
 # ==========================================
+@app.post("/api/chat")
+def chat_with_jarvis(req: ChatRequest):
+    try:
+        contents = [req.message]
+        if req.image:
+            import base64
+            if "," in req.image:
+                mime_type = req.image.split(";")[0].split(":")[1]
+                img_base64 = req.image.split(",")[1]
+            else:
+                mime_type = "image/jpeg"
+                img_base64 = req.image
+            
+            img_bytes = base64.b64decode(img_base64)
+            contents.append(
+                types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
+            )
+
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction="You are J.A.R.V.I.S, a sarcastic, highly intelligent financial assistant. If the user provides a receipt image, analyze the receipt and reply with the extracted total amount and items.",
+                temperature=0.7,
+            ),
+        )
+        return {"status": "success", "response": response.text}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "response": f"System error: {str(e)}"}
+
 @app.post("/api/nudge")
 def generate_nudge(req: NudgeRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == req.user_id).first()
@@ -409,3 +449,47 @@ def delete_transaction(trx_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "success", "pesan": f"Transaksi {trx_id} berhasil dihapus"}
+
+    import base64
+from pydantic import BaseModel
+from typing import Optional
+
+# 1. Bikin keranjang buat nangkep pesan & foto dari Frontend
+class ChatRequest(BaseModel):
+    message: str
+    image: Optional[str] = None
+
+# 2. Mesin Utama J.A.R.V.I.S
+@app.post("/api/chat")
+async def chat_with_jarvis(req: ChatRequest):
+    try:
+        # Otak sarkas J.A.R.V.I.S
+        system_prompt = "You are J.A.R.V.I.S, a sarcastic, highly intelligent financial assistant."
+        
+        # Siapin bahan obrolan
+        contents = [system_prompt, req.message]
+        
+        # Kalau user ngirim foto struk (OCR)
+        if req.image:
+            # Bersihin header Base64 dari React kalau ada
+            base64_data = req.image
+            if "," in req.image:
+                base64_data = req.image.split(",")[1]
+            
+            # Ubah teks Base64 jadi gambar beneran
+            image_bytes = base64.b64decode(base64_data)
+            
+            # Masukin gambar ke otak Gemini
+            contents.append(
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+            )
+
+        # Gas panggil Google!
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents
+        )
+        return {"status": "success", "response": response.text}
+        
+    except Exception as e:
+        return {"status": "error", "response": str(e)}

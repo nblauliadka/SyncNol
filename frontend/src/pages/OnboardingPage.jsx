@@ -145,7 +145,7 @@ export default function OnboardingPage() {
   const progress = ((step + (currentAnswer ? 1 : 0)) / STEPS.length) * 100;
 
   return (
-    <div className="min-h-screen bg-fintech-light dark:bg-fintech-dark text-slate-900 dark:text-slate-50 flex items-center justify-center p-6 relative font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-white dark:bg-[#0B0F19] text-slate-900 dark:text-slate-50 flex items-center justify-center p-6 relative font-sans transition-colors duration-300">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none"></div>
 
       <div className="w-full max-w-xl relative z-10">

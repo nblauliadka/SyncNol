@@ -1,0 +1,66 @@
+// ── SyncNol Academy — Curriculum Data File ────────────────────────────────────
+// This is the single source of truth for all academy modules.
+// To add a new module, just push a new object into this array.
+
+export const academyModules = [
+  {
+    id: "lvl1-mod1",
+    level: 1,
+    title: "Aturan Emas 50/30/20",
+    xpReward: 50,
+    youtubeId: "5b-G9E_P_H4",
+    description: "Cara ngatur gaji biar nggak numpang lewat doang.",
+    category: "Dasar",
+    duration: "8 menit",
+  },
+  {
+    id: "lvl1-mod2",
+    level: 1,
+    title: "Debt Avalanche vs Snowball",
+    xpReward: 75,
+    youtubeId: "hKz8N2eE8z0",
+    description: "Strategi melunasi utang/pinjol paling masuk akal.",
+    category: "Utang",
+    duration: "10 menit",
+  },
+  {
+    id: "lvl2-mod1",
+    level: 2,
+    title: "Dana Darurat 101",
+    xpReward: 100,
+    youtubeId: "dQw4w9WgXcQ",
+    description: "Kenapa lu butuh uang nganggur (minimal 3x pengeluaran).",
+    category: "Dasar",
+    duration: "6 menit",
+  },
+  {
+    id: "lvl2-mod2",
+    level: 2,
+    title: "Reksa Dana untuk Pemula",
+    xpReward: 125,
+    youtubeId: "p7HKvqRI_Bo",
+    description: "Cara kerja reksa dana dan kenapa ini pilihan investasi paling aman buat pemula.",
+    category: "Investasi",
+    duration: "12 menit",
+  },
+  {
+    id: "lvl3-mod1",
+    level: 3,
+    title: "Bunga Majemuk — Senjata Rahasia",
+    xpReward: 150,
+    youtubeId: "Lb5KOQFA5d4",
+    description: "Visualisasikan kekuatan bunga majemuk dan kenapa mulai lebih awal itu segalanya.",
+    category: "Lanjutan",
+    duration: "14 menit",
+  },
+  {
+    id: "lvl3-mod2",
+    level: 3,
+    title: "Asuransi: Proteksi Sebelum Investasi",
+    xpReward: 125,
+    youtubeId: "HQzoZfc3GwQ",
+    description: "Pahami asuransi jiwa & kesehatan sebelum terjebak produk salah kaprah.",
+    category: "Asuransi",
+    duration: "9 menit",
+  },
+];

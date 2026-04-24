@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import useAppStore from "../../store/useAppStore";
 import { supabase } from "../../supabaseClient";
+import { useLanguage } from "../../context/LanguageContext";
 import {
   Sun,
   Moon,
@@ -24,25 +25,27 @@ import {
   Shield,
 } from "lucide-react";
 
+// Nav items now use translation keys instead of hardcoded labels
 const NAV = [
-  { path: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/app/analytics", icon: BarChart3, label: "Analytics" },
-  { path: "/app/antigravity", icon: Rocket, label: "Antigravity" },
-  { path: "/app/planner", icon: SlidersHorizontal, label: "Planner" },
-  { path: "/app/calendar", icon: Calendar, label: "Calendar" },
-  { path: "/app/reports", icon: FileText, label: "Reports" },
-  { path: "/app/academy", icon: GraduationCap, label: "Academy" },
-  { path: "/app/vault", icon: Lock, label: "The Vault" },
-  { path: "/app/wingman", icon: Users, label: "Wingman" },
-  { path: "/app/admin-portal", icon: Shield, label: "Admin Portal" },
+  { path: "/app/dashboard", icon: LayoutDashboard, key: "nav_dashboard" },
+  { path: "/app/analytics", icon: BarChart3, key: "nav_analytics" },
+  { path: "/app/antigravity", icon: Rocket, key: "nav_debt" },
+  { path: "/app/planner", icon: SlidersHorizontal, key: "nav_planner" },
+  { path: "/app/calendar", icon: Calendar, key: "nav_calendar" },
+  { path: "/app/reports", icon: FileText, key: "nav_reports" },
+  { path: "/app/academy", icon: GraduationCap, key: "nav_academy" },
+  { path: "/app/vault", icon: Lock, key: "nav_vault" },
+  { path: "/app/wingman", icon: Users, key: "nav_wingman" },
+  { path: "/app/admin-portal", icon: Shield, key: "nav_admin" },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const { userName, sidebarCollapsed, toggleSidebar, theme, toggleTheme } =
     useAppStore();
+  // 5.4 – Use global translation function
+  const { t } = useLanguage();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -52,20 +55,36 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/", { replace: true });
+    // Clear persisted Zustand store to prevent stale session data
+    localStorage.removeItem("syncnol-storage");
+    // Reset critical store state
+    useAppStore.setState({
+      session: null,
+      dbUserId: null,
+      userName: "Agent",
+      transactions: [],
+      summary: { net_worth: 0, pemasukan: 0, pengeluaran: 0, total_utang: 0, nama: "Agent" },
+    });
+    navigate("/auth", { replace: true });
   };
 
   const collapsed = !isMobile && sidebarCollapsed;
+  const isAdmin = false; // Mock condition to hide Admin Portal
 
-  const sidebarContent = (
+  const filteredNav = NAV.filter((item) => {
+    if (item.key === "nav_admin") return isAdmin;
+    return true;
+  });
+
+  return (
     <div
-      className={`flex flex-col h-full bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex-shrink-0 ${collapsed ? "w-[72px]" : "w-64"}`}
+      className={`hidden md:flex flex-col h-full bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex-shrink-0 ${collapsed ? "w-[72px]" : "w-64"}`}
     >
       {/* Logo Area */}
       <div
         className={`flex items-center p-4 border-b border-slate-200 dark:border-slate-800 min-h-[72px] ${collapsed ? "justify-center" : "justify-between"}`}
       >
-        {(!collapsed || isMobile) && (
+        {!collapsed && (
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 rounded-lg bg-fintech-primary flex items-center justify-center text-white shadow-sm flex-shrink-0">
               <Zap size={18} fill="currentColor" />
@@ -75,65 +94,64 @@ export default function Sidebar() {
             </span>
           </div>
         )}
-        {collapsed && !isMobile && (
+        {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-fintech-primary flex items-center justify-center text-white shadow-sm flex-shrink-0">
             <Zap size={18} fill="currentColor" />
           </div>
         )}
-        {!isMobile && (
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors flex-shrink-0"
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-        )}
+        <button
+          onClick={toggleSidebar}
+          className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors flex-shrink-0"
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
       </div>
 
       {/* Nav Links */}
       <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
-        {NAV.map(({ path, icon: Icon, label }) => (
-          <NavLink
-            key={path}
-            to={path}
-            onClick={() => isMobile && setMobileOpen(false)}
-            className={({ isActive }) => `
-              flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200
-              ${
-                isActive
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-fintech-primary dark:text-blue-400"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
-              }
-              ${collapsed ? "justify-center" : "justify-start"}
-            `}
-            title={collapsed ? label : undefined}
-          >
-            <Icon size={20} className={collapsed ? "" : "flex-shrink-0"} />
-            {!collapsed && <span className="whitespace-nowrap">{label}</span>}
-          </NavLink>
-        ))}
+        {filteredNav.map(({ path, icon: Icon, key }) => {
+          const label = t(key);
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200
+                ${
+                  isActive
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-fintech-primary dark:text-blue-400"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
+                }
+                ${collapsed ? "justify-center" : "justify-start"}
+              `}
+              title={collapsed ? label : undefined}
+            >
+              <Icon size={20} className={collapsed ? "" : "flex-shrink-0"} />
+              {!collapsed && <span className="whitespace-nowrap">{label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Footer (Theme Toggle & User) */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
         <NavLink
           to="/app/settings"
-          onClick={() => isMobile && setMobileOpen(false)}
           className={({ isActive }) => `
             flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors
             ${isActive ? "bg-blue-50 dark:bg-blue-900/20 text-fintech-primary dark:text-blue-400" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"}
             ${collapsed ? "justify-center" : "justify-start"}
           `}
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? t("nav_settings") : undefined}
         >
           <Settings size={20} className="flex-shrink-0" />
-          {!collapsed && <span className="whitespace-nowrap">Settings</span>}
+          {!collapsed && <span className="whitespace-nowrap">{t("nav_settings")}</span>}
         </NavLink>
 
         <button
           onClick={toggleTheme}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${collapsed ? "justify-center" : "justify-start"}`}
-          title={collapsed ? "Toggle Theme" : undefined}
+          title={collapsed ? t(theme === "dark" ? "theme_light" : "theme_dark") : undefined}
         >
           {theme === "dark" ? (
             <Sun size={20} className="flex-shrink-0" />
@@ -142,7 +160,7 @@ export default function Sidebar() {
           )}
           {!collapsed && (
             <span className="whitespace-nowrap">
-              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              {t(theme === "dark" ? "theme_light" : "theme_dark")}
             </span>
           )}
         </button>
@@ -159,7 +177,7 @@ export default function Sidebar() {
               <button
                 onClick={handleSignOut}
                 className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                title="Sign Out"
+                title="Keluar"
               >
                 <LogOut size={16} />
               </button>
@@ -169,45 +187,4 @@ export default function Sidebar() {
       </div>
     </div>
   );
-
-  if (isMobile) {
-    return (
-      <>
-        {/* Mobile Top Bar */}
-        <div className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-40">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-fintech-primary flex items-center justify-center text-white shadow-sm">
-              <Zap size={16} fill="currentColor" />
-            </div>
-            <span className="font-bold text-lg text-slate-900 dark:text-white">
-              Sync<span className="text-fintech-primary">Nol</span>
-            </span>
-          </div>
-          <button
-            onClick={() => setMobileOpen((o) => !o)}
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-
-        {/* Overlay */}
-        {mobileOpen && (
-          <div
-            onClick={() => setMobileOpen(false)}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 transition-opacity"
-          />
-        )}
-
-        {/* Drawer */}
-        <div
-          className={`fixed top-0 left-0 bottom-0 w-64 z-50 transform transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
-        >
-          {sidebarContent}
-        </div>
-      </>
-    );
-  }
-
-  return sidebarContent;
 }

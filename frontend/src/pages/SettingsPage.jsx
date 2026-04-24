@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   Bell,
@@ -10,20 +10,44 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useAppStore from "../store/useAppStore";
+import { useLanguage } from "../context/LanguageContext";
+
+const SETTINGS_KEY = "syncnol-settings-prefs";
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { currency: "IDR", notifications: true, persona: "Roast" };
+}
+
+function savePrefs(prefs) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs));
+  } catch (_) {}
+}
 
 export default function SettingsPage() {
   const { setTransactions, setSummary } = useAppStore();
-  const [currency, setCurrency] = useState("IDR");
-  const [notifications, setNotifications] = useState(true);
-  const [persona, setPersona] = useState("Roast");
+  const { lang, setLang, t } = useLanguage();
+
+  const [currency, setCurrency] = useState(() => loadPrefs().currency);
+  const [notifications, setNotifications] = useState(() => loadPrefs().notifications);
+  const [persona, setPersona] = useState(() => loadPrefs().persona);
   const [showWipeModal, setShowWipeModal] = useState(false);
 
+  // Persist to localStorage whenever preferences change
+  useEffect(() => {
+    savePrefs({ currency, notifications, persona });
+  }, [currency, notifications, persona]);
+
   const handleSavePreferences = () => {
+    savePrefs({ currency, notifications, persona });
     toast.success("Preferences saved successfully");
   };
 
   const handleWipeData = () => {
-    // Mock wiping data
     setTransactions([]);
     setSummary({ net_worth: 0, monthly_income: 0, pengeluaran: 0 });
     toast.error("All transaction data has been permanently wiped", {
@@ -41,7 +65,7 @@ export default function SettingsPage() {
     "bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm";
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-y-auto bg-slate-50 dark:bg-fintech-dark text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300">
+    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 gap-6 overflow-y-auto bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-slate-50 font-sans transition-colors duration-300 pb-24 md:pb-8">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
         <div>
@@ -55,6 +79,12 @@ export default function SettingsPage() {
             Settings
           </h1>
         </div>
+        <button
+          onClick={handleSavePreferences}
+          className="self-start md:self-auto bg-fintech-primary hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors"
+        >
+          Save Preferences
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-4xl">
@@ -65,7 +95,7 @@ export default function SettingsPage() {
             Preferences
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
                 Base Currency
@@ -74,7 +104,7 @@ export default function SettingsPage() {
                 value={currency}
                 onChange={(e) => {
                   setCurrency(e.target.value);
-                  toast("Currency updated to " + e.target.value, {
+                  toast(`Currency updated to ${e.target.value}`, {
                     icon: "💱",
                   });
                 }}
@@ -87,8 +117,32 @@ export default function SettingsPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                {t("settings_language")}
+              </label>
+              <div className="flex gap-2">
+                {["ID", "EN"].map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => {
+                      setLang(l);
+                      toast(`Bahasa diubah ke ${l}`, { icon: "🌍" });
+                    }}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all ${
+                      lang === l
+                        ? "bg-fintech-primary text-white border-fintech-primary shadow-sm"
+                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-fintech-primary"
+                    }`}
+                  >
+                    {l === "ID" ? "🇮🇩 Indonesia" : "🇺🇸 English"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                <Bell size={16} /> Push Notifications
+                <Bell size={16} /> Notifications
               </label>
               <div className="flex items-center gap-3">
                 <button
@@ -98,7 +152,7 @@ export default function SettingsPage() {
                   }}
                   className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${notifications ? "bg-fintech-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}
                 >
-                  Enabled
+                  On
                 </button>
                 <button
                   onClick={() => {
@@ -107,7 +161,7 @@ export default function SettingsPage() {
                   }}
                   className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${!notifications ? "bg-slate-700 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}
                 >
-                  Disabled
+                  Off
                 </button>
               </div>
             </div>

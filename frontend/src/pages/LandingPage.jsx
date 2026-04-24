@@ -1,667 +1,422 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Bot,
+  ShieldCheck,
+  Users,
+  Zap,
+  BarChart3,
+  ArrowRight,
+  Sparkles,
+  Moon,
+  Sun,
+  ChevronRight,
+  Terminal,
+} from "lucide-react";
 
-const TYPING_LINES = [
-  {
-    user: "gajian masuk 5 juta bulan ini",
-    ai: "Noted. Rp 5,000,000 logged as income. Your runway just extended to 47 days. Now stop celebrating and pay that BPJS bill you've been ghosting.",
-  },
-  {
-    user: "beli kopi starbucks 75rb",
-    ai: "Rp 75,000 for caffeine? That's 0.3% of your emergency fund. I'm logging it, but at this rate you'll retire at 74. Just saying.",
-  },
-  {
-    user: "gimana kondisi keuangan gue?",
-    ai: "Net worth: Rp 2.1M. Debt: Rp 8.5M. Savings rate: 4%. You're not broke — you're pre-broke. Let's fix that before it gets worse.",
-  },
-  {
-    user: "mau nabung buat laptop baru",
-    ai: "Set goal: Laptop Rp 12,000,000. At your current savings rate of Rp 200k/month, you'll get there in 5 years. Want me to activate Frugal Mode?",
-  },
-];
-
-const FEATURES = [
-  {
-    icon: "🚀",
-    title: "Antigravity Engine",
-    desc: "Obliterates debt with Snowball & Avalanche strategies. Detects silent subscription leaks automatically.",
-  },
-  {
-    icon: "🛑",
-    title: "Impulse Interceptor",
-    desc: "Red panic button. Before you buy, the AI roasts your decision and shows the opportunity cost in 30 years.",
-  },
-  {
-    icon: "🗓️",
-    title: "Financial Heatmap",
-    desc: "Full calendar. Red = bills incoming. Green = payday. Click any date to see your predicted balance.",
-  },
-  {
-    icon: "🧠",
-    title: "AI Academy",
-    desc: "Drop a YouTube link or PDF. The AI builds you a custom curriculum and quizzes you on it.",
-  },
-  {
-    icon: "📊",
-    title: "Boardroom Reports",
-    desc: "PDF generator with AI-written Financial Opinion Letters. Present to your parents, or just feel important.",
-  },
-  {
-    icon: "🔒",
-    title: "The Vault",
-    desc: "Locked savings goal. To withdraw early, you must argue with the AI and pass a Mental CAPTCHA.",
-  },
-];
-
-function TypewriterText({ text, speed = 22, onDone }) {
+// ─── Typewriter Hook ──────────────────────────────────────────────────────────
+function useTypewriter(text, speed = 28, startDelay = 0) {
   const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
   useEffect(() => {
     setDisplayed("");
+    setDone(false);
     let i = 0;
-    const interval = setInterval(() => {
-      if (i < text.length) {
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
         setDisplayed(text.slice(0, i + 1));
         i++;
-      } else {
-        clearInterval(interval);
-        onDone?.();
-      }
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed]);
-  return <span>{displayed}</span>;
+        if (i >= text.length) {
+          clearInterval(interval);
+          setDone(true);
+        }
+      }, speed);
+      return () => clearInterval(interval);
+    }, startDelay);
+    return () => clearTimeout(timeout);
+  }, [text, speed, startDelay]);
+  return { displayed, done };
 }
 
-function DemoTerminal() {
-  const [lineIdx, setLineIdx] = useState(0);
-  const [phase, setPhase] = useState("user"); // 'user' | 'ai' | 'pause'
-  const [userInput, setUserInput] = useState("");
-  const [history, setHistory] = useState([]);
-  const bottomRef = useRef(null);
+// ─── AI Terminal Mock ─────────────────────────────────────────────────────────
+const userMsg = "Split last night's dinner bill. Total was $124.80 across 4 people.";
+const aiResponse = `> Activating Wingman Protocol...
+
+✦ Parsing bill total: $124.80
+✦ Participants detected: 4
+
+─────────────────────────────
+  Each person owes:  $31.20
+─────────────────────────────
+
+Breakdown generated. Ready to send
+split requests via link or QR code.`;
+
+function AITerminal() {
+  const [phase, setPhase] = useState(0); // 0: idle, 1: user typing, 2: ai typing
+  const scrollRef = useRef(null);
+
+  const userTyper = useTypewriter(userMsg, 30, phase === 1 ? 0 : 99999);
+  const aiTyper = useTypewriter(aiResponse, 18, phase === 2 ? 0 : 99999);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history, phase]);
+    const t = setTimeout(() => setPhase(1), 800);
+    return () => clearTimeout(t);
+  }, []);
 
-  const handleUserDone = () => {
-    setHistory((h) => [
-      ...h,
-      { type: "user", text: TYPING_LINES[lineIdx].user },
-    ]);
-    setTimeout(() => setPhase("ai"), 400);
-  };
+  useEffect(() => {
+    if (userTyper.done && phase === 1) {
+      const t = setTimeout(() => setPhase(2), 600);
+      return () => clearTimeout(t);
+    }
+  }, [userTyper.done, phase]);
 
-  const handleAiDone = () => {
-    setHistory((h) => [...h, { type: "ai", text: TYPING_LINES[lineIdx].ai }]);
-    setTimeout(() => {
-      const next = lineIdx + 1;
-      if (next < TYPING_LINES.length) {
-        setLineIdx(next);
-        setPhase("user");
-      } else {
-        setTimeout(() => {
-          setHistory([]);
-          setLineIdx(0);
-          setPhase("user");
-        }, 3000);
-      }
-    }, 1800);
-  };
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [userTyper.displayed, aiTyper.displayed]);
 
   return (
-    <div
-      style={{
-        background: "rgba(10,10,10,0.95)",
-        border: "1px solid rgba(57,255,20,0.2)",
-        borderRadius: 20,
-        padding: "0",
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.82rem",
-        overflow: "hidden",
-        boxShadow: "0 0 60px rgba(57,255,20,0.08)",
-        width: "100%",
-        maxWidth: 640,
-      }}
-    >
-      {/* Terminal bar */}
-      <div
-        style={{
-          background: "#0f0f0f",
-          padding: "12px 18px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
-        }}
-      >
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "#ff5f56",
-            display: "inline-block",
-          }}
-        />
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "#ffbd2e",
-            display: "inline-block",
-          }}
-        />
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "#27c93f",
-            display: "inline-block",
-          }}
-        />
-        <span style={{ color: "#444", marginLeft: 10, fontSize: "0.75rem" }}>
-          syncnol-agent — zsh
-        </span>
-      </div>
-
-      <div
-        style={{
-          padding: "20px 20px",
-          minHeight: 280,
-          maxHeight: 360,
-          overflowY: "auto",
-        }}
-      >
-        <div style={{ color: "#39ff14", marginBottom: 16 }}>
-          {"> "}
-          <span style={{ color: "#a0a0a0" }}>
-            SyncNol Agent v2.0 — Roast Mode Active 🔥
+    <div className="relative w-full max-w-[480px] mx-auto">
+      {/* Glow */}
+      <div className="absolute -inset-4 bg-cyan-500/10 rounded-3xl blur-2xl pointer-events-none" />
+      {/* Window chrome */}
+      <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 shadow-2xl dark:shadow-cyan-900/20 overflow-hidden font-mono text-sm">
+        {/* Title bar */}
+        <div className="flex items-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700/60">
+          <span className="w-3 h-3 rounded-full bg-red-400" />
+          <span className="w-3 h-3 rounded-full bg-amber-400" />
+          <span className="w-3 h-3 rounded-full bg-emerald-400" />
+          <span className="ml-2 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+            <Terminal size={11} /> syncnol — co-pilot
           </span>
         </div>
 
-        {history.map((h, i) => (
-          <div key={i} style={{ marginBottom: 14 }}>
-            {h.type === "user" ? (
-              <div style={{ color: "#a0a0a0" }}>
-                <span style={{ color: "#39ff14" }}>you@wallet:~$ </span>
-                {h.text}
-              </div>
-            ) : (
-              <div
-                style={{
-                  color: "#f0f0f0",
-                  background: "rgba(57,255,20,0.04)",
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  borderLeft: "2px solid rgba(57,255,20,0.4)",
-                  marginTop: 6,
-                }}
-              >
-                <span style={{ color: "#39ff14", marginRight: 8 }}>
-                  ⚡ agent:
-                </span>
-                {h.text}
-              </div>
-            )}
+        {/* Chat body */}
+        <div
+          ref={scrollRef}
+          className="p-5 space-y-4 h-[340px] overflow-y-auto scrollbar-none"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {/* System banner */}
+          <div className="flex items-center gap-2 text-xs text-cyan-600 dark:text-cyan-400">
+            <Sparkles size={12} />
+            <span>J.A.R.V.I.S Co-Pilot online — ready.</span>
           </div>
-        ))}
 
-        {/* Active line */}
-        {phase === "user" && (
-          <div style={{ color: "#a0a0a0" }}>
-            <span style={{ color: "#39ff14" }}>you@wallet:~$ </span>
-            <TypewriterText
-              text={TYPING_LINES[lineIdx].user}
-              onDone={handleUserDone}
-            />
-            <span className="animate-blink" style={{ color: "#39ff14" }}>
-              ▊
-            </span>
+          {/* User bubble */}
+          {phase >= 1 && (
+            <div className="flex justify-end">
+              <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-cyan-500 text-white px-4 py-2.5 text-xs leading-relaxed shadow-lg shadow-cyan-500/20">
+                {userTyper.displayed}
+                {!userTyper.done && (
+                  <span className="inline-block w-1.5 h-3.5 bg-white/70 ml-0.5 animate-pulse align-middle" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AI response */}
+          {phase >= 2 && (
+            <div className="flex justify-start">
+              <div className="max-w-[88%]">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                    <Bot size={11} className="text-white" />
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">J.A.R.V.I.S</span>
+                </div>
+                <div className="rounded-2xl rounded-bl-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap border border-slate-200 dark:border-slate-700/50">
+                  {aiTyper.displayed}
+                  {!aiTyper.done && (
+                    <span className="inline-block w-1.5 h-3.5 bg-slate-400 ml-0.5 animate-pulse align-middle" />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input bar */}
+        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2">
+          <div className="flex-1 h-8 rounded-lg bg-white dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600/50 flex items-center px-3">
+            <span className="text-[11px] text-slate-300 dark:text-slate-600">Ask anything about your money…</span>
           </div>
-        )}
-        {phase === "ai" && (
-          <div
-            style={{
-              color: "#f0f0f0",
-              background: "rgba(57,255,20,0.04)",
-              padding: "10px 14px",
-              borderRadius: 10,
-              borderLeft: "2px solid rgba(57,255,20,0.4)",
-              marginTop: 6,
-            }}
-          >
-            <span style={{ color: "#39ff14", marginRight: 8 }}>⚡ agent:</span>
-            <TypewriterText
-              text={TYPING_LINES[lineIdx].ai}
-              speed={14}
-              onDone={handleAiDone}
-            />
-          </div>
-        )}
-        <div ref={bottomRef} />
+          <button className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center shadow shadow-cyan-500/30 flex-shrink-0">
+            <ArrowRight size={13} className="text-white" />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-export default function LandingPage() {
+// ─── Features Data ────────────────────────────────────────────────────────────
+const features = [
+  {
+    icon: LayoutDashboard,
+    name: "Executive Dashboard",
+    desc: "See your entire financial life at a glance. Net worth, spending rate, and trends — all in one command center.",
+    accent: "from-blue-500 to-indigo-600",
+    glow: "group-hover:shadow-blue-500/20",
+  },
+  {
+    icon: Bot,
+    name: "J.A.R.V.I.S Co-Pilot",
+    desc: "Chat with your AI co-pilot in plain English. Ask questions, get insights, and make smarter decisions — instantly.",
+    accent: "from-cyan-400 to-blue-500",
+    glow: "group-hover:shadow-cyan-500/20",
+  },
+  {
+    icon: ShieldCheck,
+    name: "The Vault",
+    desc: "Set spending guardrails for impulse categories. Your wallet's immune system against bad financial days.",
+    accent: "from-emerald-400 to-teal-500",
+    glow: "group-hover:shadow-emerald-500/20",
+  },
+  {
+    icon: Users,
+    name: "Wingman Protocol",
+    desc: "Split any bill in seconds. Dinners, trips, rent — SyncNol calculates, generates links, and tracks who owes what.",
+    accent: "from-violet-500 to-purple-600",
+    glow: "group-hover:shadow-violet-500/20",
+  },
+  {
+    icon: Zap,
+    name: "Zero-Friction Logging",
+    desc: "Log an expense in under 3 seconds. Type it, say it, snap it — SyncNol parses it and files it automatically.",
+    accent: "from-amber-400 to-orange-500",
+    glow: "group-hover:shadow-amber-500/20",
+  },
+  {
+    icon: BarChart3,
+    name: "Smart Analytics",
+    desc: "Weekly AI-generated spending reports that actually speak human. Know exactly where every dollar went.",
+    accent: "from-pink-500 to-rose-500",
+    glow: "group-hover:shadow-pink-500/20",
+  },
+];
+
+// ─── Navbar ───────────────────────────────────────────────────────────────────
+function Navbar({ dark, toggleDark }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 16);
+    window.addEventListener("scroll", handler);
+    return () => window.removeEventListener("scroll", handler);
+  }, []);
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-void)",
-        position: "relative",
-        overflow: "hidden",
-      }}
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-white/80 dark:bg-[#0B0F19]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/40 shadow-sm"
+          : "bg-transparent"
+      }`}
     >
-      {/* Background grid */}
-      <div
-        className="bg-grid"
-        style={{
-          position: "fixed",
-          inset: 0,
-          opacity: 0.4,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Glow orbs */}
-      <div
-        style={{
-          position: "fixed",
-          top: "15%",
-          left: "10%",
-          width: 500,
-          height: 500,
-          background:
-            "radial-gradient(circle, rgba(57,255,20,0.06) 0%, transparent 70%)",
-          pointerEvents: "none",
-          borderRadius: "50%",
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          bottom: "10%",
-          right: "5%",
-          width: 400,
-          height: 400,
-          background:
-            "radial-gradient(circle, rgba(57,255,20,0.04) 0%, transparent 70%)",
-          pointerEvents: "none",
-          borderRadius: "50%",
-        }}
-      />
-
-      {/* NAV */}
-      <nav
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          padding: "18px 40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "rgba(5,5,5,0.8)",
-          backdropFilter: "blur(20px)",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              background: "var(--accent)",
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 20px rgba(57,255,20,0.4)",
-            }}
-          >
-            <span style={{ fontSize: "1rem" }}>⚡</span>
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <a href="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:scale-105 transition-transform">
+            <Sparkles size={15} className="text-white" />
           </div>
-          <span
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontWeight: 700,
-              fontSize: "1.15rem",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Sync<span style={{ color: "var(--accent)" }}>Nol</span>
+          <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+            Sync<span className="text-cyan-500">Nol</span>
           </span>
-        </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <Link
-            to="/auth"
-            className="btn btn-ghost"
-            style={{ padding: "9px 20px", fontSize: "0.85rem" }}
+        </a>
+
+        {/* Right */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleDark}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <a
+            href="/auth"
+            className="hidden sm:block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors px-3 py-2"
           >
             Sign In
-          </Link>
-          <Link
-            to="/auth?mode=signup"
-            className="btn btn-primary"
-            style={{ padding: "9px 20px", fontSize: "0.85rem" }}
-          >
-            Deploy Agent →
-          </Link>
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <section
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "120px 24px 80px",
-          textAlign: "center",
-          position: "relative",
-        }}
-      >
-        <div
-          className="badge badge-accent animate-fadeInUp"
-          style={{ marginBottom: 24 }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "var(--accent)",
-              display: "inline-block",
-              boxShadow: "0 0 6px var(--accent)",
-            }}
-          />
-          AI-Powered • Agentic • Free
-        </div>
-
-        <h1
-          className="animate-fadeInUp delay-100"
-          style={{
-            fontSize: "clamp(2.8rem, 7vw, 5.5rem)",
-            fontWeight: 900,
-            lineHeight: 1.05,
-            letterSpacing: "-0.04em",
-            maxWidth: 900,
-            marginBottom: 24,
-          }}
-        >
-          Stop Tracking Your Money.
-          <br />
-          <span className="gradient-text">Let AI Command It.</span>
-        </h1>
-
-        <p
-          className="animate-fadeInUp delay-200"
-          style={{
-            fontSize: "clamp(1rem, 2.5vw, 1.2rem)",
-            color: "var(--text-secondary)",
-            maxWidth: 580,
-            marginBottom: 48,
-            lineHeight: 1.7,
-          }}
-        >
-          SyncNol is not a budgeting app. It's an AI financial exoskeleton that
-          hunts down your debt, intercepts impulse buys, and builds wealth while
-          you sleep.
-        </p>
-
-        <div
-          className="animate-fadeInUp delay-300"
-          style={{
-            display: "flex",
-            gap: 16,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            marginBottom: 80,
-          }}
-        >
-          <Link
-            to="/auth?mode=signup"
-            className="btn btn-primary"
-            style={{ padding: "16px 36px", fontSize: "1rem" }}
-          >
-            ⚡ Deploy Your Agent
-          </Link>
+          </a>
           <a
-            href="#demo"
-            className="btn btn-ghost"
-            style={{ padding: "16px 32px", fontSize: "1rem" }}
+            href="/dashboard"
+            className="flex items-center gap-1.5 text-sm font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
-            Watch the Demo ↓
+            Launch Workspace
+            <ChevronRight size={14} />
           </a>
         </div>
+      </div>
+    </nav>
+  );
+}
 
-        {/* Floating stat cards */}
-        <div
-          className="animate-fadeInUp delay-400"
-          style={{
-            display: "flex",
-            gap: 16,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          {[
-            { label: "Avg Debt Paid Off", value: "4.2mo", icon: "🏦" },
-            { label: "Leaks Detected", value: "3.1/user", icon: "🔍" },
-            { label: "Net Worth Growth", value: "+28%", icon: "📈" },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="glass"
-              style={{
-                padding: "14px 24px",
-                borderRadius: 16,
-                textAlign: "center",
-                minWidth: 130,
-              }}
-            >
-              <div style={{ fontSize: "1.4rem", marginBottom: 4 }}>
-                {s.icon}
-              </div>
-              <div
-                style={{
-                  fontSize: "1.4rem",
-                  fontWeight: 800,
-                  color: "var(--accent)",
-                }}
-              >
-                {s.value}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                {s.label}
-              </div>
+// ─── Main LandingPage ─────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setDark(prefersDark);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-white transition-colors duration-300">
+      {/* Ambient background blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full bg-cyan-400/6 dark:bg-cyan-400/4 blur-3xl" />
+        <div className="absolute top-1/3 -right-32 w-[500px] h-[500px] rounded-full bg-blue-500/6 dark:bg-blue-500/5 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-violet-500/4 dark:bg-violet-500/4 blur-3xl" />
+      </div>
+
+      <Navbar dark={dark} toggleDark={() => setDark((d) => !d)} />
+
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-20 lg:pt-40 lg:pb-28">
+        <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-12">
+          {/* Left copy */}
+          <div className="flex-1 text-center lg:text-left">
+            {/* Eyebrow */}
+            <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 text-xs font-semibold text-cyan-600 dark:text-cyan-400 tracking-wide uppercase">
+              <Sparkles size={11} />
+              AI-Powered Finance
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* DEMO TERMINAL */}
-      <section
-        id="demo"
-        style={{
-          padding: "80px 24px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div className="badge badge-accent" style={{ marginBottom: 20 }}>
-          Live Demo
-        </div>
-        <h2
-          style={{
-            fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
-            fontWeight: 800,
-            textAlign: "center",
-            marginBottom: 12,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          Get <span className="gradient-text">Roasted</span> by the AI
-        </h2>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            marginBottom: 40,
-            textAlign: "center",
-            maxWidth: 480,
-          }}
-        >
-          This is how SyncNol talks to you. Brutally honest. No sugarcoating.
-          Pure financial truth.
-        </p>
-        <DemoTerminal />
-      </section>
+            {/* Headline */}
+            <h1 className="text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight leading-[1.05] mb-6">
+              Your smart
+              <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500 bg-clip-text text-transparent">
+                financial
+              </span>
+              <br />
+              co-pilot.
+            </h1>
 
-      {/* FEATURES */}
-      <section
-        style={{ padding: "80px 24px", maxWidth: 1100, margin: "0 auto" }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 60 }}>
-          <div className="badge badge-accent" style={{ marginBottom: 16 }}>
-            The Arsenal
+            {/* Subtitle */}
+            <p className="text-lg lg:text-xl text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto lg:mx-0 mb-8">
+              Track your net worth, log expenses in seconds, split bills effortlessly, and get AI-driven insights — all in one sleek workspace.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">
+              <a
+                href="/auth"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 font-semibold text-base bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-7 py-3.5 rounded-2xl shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Get Started
+                <ArrowRight size={17} />
+              </a>
+              <a
+                href="/dashboard"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 font-medium text-base text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-7 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+              >
+                View Dashboard
+              </a>
+            </div>
+
+            {/* Social proof pill */}
+            <p className="mt-6 text-xs text-slate-400 dark:text-slate-600">
+              Free to start · No credit card required
+            </p>
           </div>
-          <h2
-            style={{
-              fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
-              fontWeight: 800,
-              letterSpacing: "-0.03em",
-            }}
-          >
-            Six Weapons. One Goal.
-          </h2>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: 20,
-          }}
-        >
-          {FEATURES.map((f, i) => (
-            <div
-              key={f.title}
-              className="card card-accent animate-fadeInUp"
-              style={{ animationDelay: `${i * 0.08}s` }}
-            >
-              <div style={{ fontSize: "2rem", marginBottom: 16 }}>{f.icon}</div>
-              <h3
-                style={{
-                  fontSize: "1.05rem",
-                  fontWeight: 700,
-                  marginBottom: 10,
-                  color: "var(--accent)",
-                }}
-              >
-                {f.title}
-              </h3>
-              <p
-                style={{
-                  color: "var(--text-secondary)",
-                  fontSize: "0.88rem",
-                  lineHeight: 1.65,
-                }}
-              >
-                {f.desc}
-              </p>
-            </div>
-          ))}
+
+          {/* Right — AI Terminal */}
+          <div className="flex-1 w-full lg:max-w-[480px]">
+            <AITerminal />
+          </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section style={{ padding: "80px 24px 120px", textAlign: "center" }}>
-        <div
-          className="glass"
-          style={{
-            maxWidth: 680,
-            margin: "0 auto",
-            padding: "60px 40px",
-            borderRadius: 28,
-            background:
-              "linear-gradient(135deg, rgba(57,255,20,0.05) 0%, rgba(15,15,15,0.9) 100%)",
-            borderColor: "var(--border-accent)",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              fontWeight: 900,
-              letterSpacing: "-0.04em",
-              marginBottom: 16,
-            }}
-          >
-            Your financial life is
-            <br />
-            <span className="gradient-text">waiting for orders.</span>
+      {/* ── Features ──────────────────────────────────────────────────────── */}
+      <section className="relative max-w-6xl mx-auto px-6 pb-28">
+        {/* Section header */}
+        <div className="text-center mb-12">
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight mb-3">
+            Everything your money needs.
           </h2>
-          <p
-            style={{
-              color: "var(--text-secondary)",
-              marginBottom: 36,
-              fontSize: "1rem",
-            }}
-          >
-            Join thousands of agents already commanding their wealth.
+          <p className="text-slate-500 dark:text-slate-400 text-base max-w-lg mx-auto">
+            Six powerful modules. One unified workspace. Zero financial anxiety.
           </p>
-          <Link
-            to="/auth?mode=signup"
-            className="btn btn-primary"
-            style={{ padding: "18px 44px", fontSize: "1.05rem" }}
-          >
-            ⚡ Deploy Your Agent — Free
-          </Link>
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((f) => {
+            const Icon = f.icon;
+            return (
+              <div
+                key={f.name}
+                className={`group relative rounded-2xl p-6 bg-white dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600/60 shadow-sm hover:shadow-xl ${f.glow} dark:shadow-black/20 transition-all duration-300 hover:-translate-y-1 cursor-default overflow-hidden`}
+              >
+                {/* Subtle top gradient line */}
+                <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${f.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+
+                {/* Icon */}
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${f.accent} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon size={19} className="text-white" strokeWidth={1.8} />
+                </div>
+
+                <h3 className="font-bold text-base mb-1.5 text-slate-900 dark:text-white">
+                  {f.name}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {f.desc}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Footer */}
-      <footer
-        style={{
-          borderTop: "1px solid var(--border)",
-          padding: "24px 40px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-          © 2026 SyncNol. All rights reserved.
-        </span>
-        <div style={{ display: "flex", gap: 20 }}>
-          <Link
-            to="/privacy"
-            style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}
-          >
-            Privacy Policy
-          </Link>
-          <Link
-            to="/terms"
-            style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}
-          >
-            Terms of Service
-          </Link>
+      {/* ── CTA Banner ────────────────────────────────────────────────────── */}
+      <section className="relative max-w-6xl mx-auto px-6 pb-28">
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 p-px shadow-2xl shadow-blue-500/30">
+          <div className="rounded-[23px] bg-gradient-to-br from-cyan-500/90 via-blue-600/90 to-violet-600/90 backdrop-blur px-8 py-14 text-center">
+            {/* Noise texture overlay */}
+            <div className="absolute inset-0 opacity-[0.03] [background-image:url('data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20256%20256%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter%20id%3D%22noise%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%224%22%20stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20filter%3D%22url%28%23noise%22%2F%3E%3C%2Fsvg%3E')]" />
+            <h2 className="relative text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight">
+              Take control. Finally.
+            </h2>
+            <p className="relative text-blue-100 mb-8 max-w-md mx-auto text-base">
+              Stop guessing where your money went. SyncNol gives you clarity, control, and an AI co-pilot in your corner.
+            </p>
+            <a
+              href="/auth"
+              className="relative inline-flex items-center gap-2 font-bold text-blue-700 bg-white hover:bg-blue-50 px-7 py-3.5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Start for Free
+              <ArrowRight size={17} />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ────────────────────────────────────────────────────────── */}
+      <footer className="relative border-t border-slate-200 dark:border-slate-800">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <a href="/" className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+              <Sparkles size={11} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+              Sync<span className="text-cyan-500">Nol</span>
+            </span>
+          </a>
+          <p className="text-xs text-slate-400 dark:text-slate-600">
+            © {new Date().getFullYear()} SyncNol. Your money, your co-pilot.
+          </p>
+          <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-600">
+            <a href="#" className="hover:text-slate-600 dark:hover:text-slate-400 transition-colors">Privacy</a>
+            <a href="#" className="hover:text-slate-600 dark:hover:text-slate-400 transition-colors">Terms</a>
+          </div>
         </div>
       </footer>
     </div>

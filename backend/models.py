@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from .database import Base
+from database import Base
 
 # 1. TABEL PROFIL USER (Udah di-upgrade buat nyimpen hasil AI Interview)
 class User(Base):
