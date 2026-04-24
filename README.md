@@ -123,10 +123,6 @@ SUPABASE_URL=https://<PROJECT-REF>.supabase.co
 SUPABASE_SERVICE_KEY=<YOUR-SERVICE-ROLE-KEY>
 ```
 
-> ⚠️ **PENTING:** Jangan pernah melakukan *push* file `.env` Anda ke GitHub! File ini sudah otomatis masuk daftar pengecualian di `.gitignore`.
-
----
-
 ## 🤝 Contributing
 
 Jika Anda menemukan *bug* atau ingin menambahkan fitur baru, silakan buat *Pull Request*:
