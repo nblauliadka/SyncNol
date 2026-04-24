@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🚀 SyncNol: Zero to Hero</h1>
+  <h1>SyncNol: Zero to Hero</h1>
   <p><b>Asisten finansial digital dan akademi literasi</b> yang dirancang khusus untuk <b>Gen Z</b>, <b>Mahasiswa</b>, dan <b>Hustler</b> untuk mengatur aset dari nol sampai jadi <i>hero</i>.</p>
 
   [![Interactive Preview](https://img.shields.io/badge/Interactive_Preview-Click_Here-0A6C75?style=for-the-badge&logo=netlify&logoColor=white)](#)
@@ -59,7 +59,7 @@ syncnol/
 
 ---
 
-## 🚀 Getting Started (Local Development)
+##  Getting Started (Local Development)
 
 Untuk menjalankan *project* ini di mesin lokal, pastikan Anda sudah menginstal **Node.js (v18+)** dan **Python (v3.10+)**. Ikuti langkah-langkah di bawah ini:
 
