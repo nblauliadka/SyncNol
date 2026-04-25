@@ -2,7 +2,7 @@
   <h1>SyncNol: Zero to Hero</h1>
   <p><b>Asisten finansial digital dan akademi literasi</b> yang dirancang khusus untuk <b>Gen Z</b>, <b>Mahasiswa</b>, dan <b>Hustler</b> untuk mengatur aset dari nol sampai jadi <i>hero</i>.</p>
 
-  [![Interactive Preview](https://img.shields.io/badge/Interactive_Preview-Click_Here-0A6C75?style=for-the-badge&logo=netlify&logoColor=white)](#)
+[![Interactive Preview](https://img.shields.io/badge/Interactive_Preview-Click_Here-0A6C75?style=for-the-badge&logo=netlify&logoColor=white)](https://syncnol.netlify.app/)
   [![React](https://img.shields.io/badge/React_19-%2320232A.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](#)
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](#)
   [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](#)
